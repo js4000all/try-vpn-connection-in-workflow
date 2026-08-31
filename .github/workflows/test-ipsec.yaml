@@ -45,12 +45,12 @@ jobs:
               leftprotoport=17/1701
 
               right=${VPN_SERVER}
+              rightid=${VPN_SERVER}
               rightprotoport=17/1701
 
               ike=aes256-sha1-modp1024!
               esp=aes256-sha1!
 
-              pfs=no
               auto=add
           EOF
 
@@ -58,10 +58,7 @@ jobs:
             sudo tee /etc/ipsec.secrets >/dev/null
 
           sudo chmod 600 /etc/ipsec.secrets
-
-          echo '--- /etc/ipsec.conf ---'
-          sudo cat /etc/ipsec.conf
-
+          
       - name: Start strongSwan
         run: |
           set -x
