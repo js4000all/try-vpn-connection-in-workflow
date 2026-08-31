@@ -31,6 +31,16 @@ jobs:
           echo "--- after modprobe ---"
           ls -l /dev/ppp
           lsmod | grep -E 'ppp|l2tp' || true
+      - name: Install VPN packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            strongswan \
+            strongswan-starter \
+            xl2tpd \
+            ppp \
+            iproute2
+
       - name: Diagnose pppd
         run: |
           set -x
@@ -52,16 +62,7 @@ jobs:
 
           dmesg | tail -100 || true
           sudo journalctl -k -n 100 || true
-      - name: Install VPN packages
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
-            strongswan \
-            strongswan-starter \
-            xl2tpd \
-            ppp \
-            iproute2
-
+          
       - name: Show versions
         run: |
           ipsec --version
