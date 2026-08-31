@@ -90,8 +90,6 @@ jobs:
 
           noauth
 
-          require-mppe
-
           mtu 1280
           mru 1280
 
