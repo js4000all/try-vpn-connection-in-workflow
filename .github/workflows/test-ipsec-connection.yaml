@@ -35,7 +35,6 @@ jobs:
               authby=psk
 
               left=%defaultroute
-              leftid=@github-runner
               leftprotoport=17/1701
 
               right=${VPN_SERVER}
