@@ -29,6 +29,7 @@ jobs:
           sudo tee /etc/ipsec.conf >/dev/null <<EOF
           config setup
               uniqueids=no
+              charondebug="ike 3, cfg 3, enc 2, net 2"
 
           conn sakura-l2tp
               keyexchange=ikev1
@@ -53,25 +54,6 @@ jobs:
             sudo tee /etc/ipsec.secrets >/dev/null
 
           sudo chmod 600 /etc/ipsec.secrets
-
-      - name: Configure strongSwan logging
-        run: |
-          sudo tee /etc/strongswan.d/charon-logging.conf >/dev/null <<'EOF'
-          charon {
-              send_vendor_id = no
-
-              filelog {
-                  /var/log/charon.log {
-                      default = 2
-                      ike = 3
-                      cfg = 3
-                      enc = 2
-                      append = no
-                      flush_line = yes
-                  }
-              }
-          }
-          EOF
 
       - name: Configure xl2tpd
         env:
@@ -195,13 +177,18 @@ jobs:
           ls -l /usr/sbin/pppd || true
           sudo /usr/sbin/pppd --version || true
 
-          echo "--- charon.log ---"
-          sudo cat /var/log/charon.log || true
-
-          echo "--- xl2tpd / ppp / IPsec journal ---"
+          echo "--- strongSwan detailed log ---"
           sudo journalctl \
             --no-pager \
             --since '10 minutes ago' |
-            grep -Ei 'xl2tpd|pppd|l2tp|ppp|charon|ipsec' |
+            grep -Ei 'charon|ipsec' |
+            tail -500 \
+            || true
+
+          echo "--- xl2tpd / ppp journal ---"
+          sudo journalctl \
+            --no-pager \
+            --since '10 minutes ago' |
+            grep -Ei 'xl2tpd|pppd|l2tp|ppp' |
             tail -300 \
             || true
