@@ -1,0 +1,81 @@
+name: Test VPN environment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show environment
+        run: |
+          uname -a
+          cat /etc/os-release
+          id
+          sudo -n true
+          echo "passwordless sudo: OK"
+
+      - name: Check PPP support
+        run: |
+          set -x
+
+          ls -l /dev/ppp || true
+
+          lsmod | grep -E 'ppp|l2tp' || true
+
+          sudo modprobe ppp_generic
+          sudo modprobe ppp_async || true
+          sudo modprobe l2tp_ppp || true
+
+          echo "--- after modprobe ---"
+          ls -l /dev/ppp
+          lsmod | grep -E 'ppp|l2tp' || true
+
+      - name: Install VPN packages
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            strongswan \
+            strongswan-starter \
+            xl2tpd \
+            ppp \
+            iproute2
+
+      - name: Show versions
+        run: |
+          ipsec --version
+          xl2tpd --version || true
+          pppd --version
+
+      - name: Check network administration
+        run: |
+          ip addr
+          ip route
+
+          sudo ip link add gha-vpn-test type dummy
+          ip link show gha-vpn-test
+          sudo ip link delete gha-vpn-test
+
+          echo "NET_ADMIN-like operations through sudo: OK"
+
+      - name: Check IPsec
+        run: |
+          sudo ipsec start
+          sudo ipsec statusall
+          sudo ipsec stop
+
+      - name: Final diagnostics
+        if: always()
+        run: |
+          echo "--- /dev/ppp ---"
+          ls -l /dev/ppp || true
+
+          echo "--- modules ---"
+          lsmod | grep -E 'ppp|l2tp|xfrm' || true
+
+          echo "--- interfaces ---"
+          ip addr || true
+
+          echo "--- routes ---"
+          ip route || true
