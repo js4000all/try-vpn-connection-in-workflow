@@ -24,6 +24,8 @@ jobs:
           VPN_SERVER: ${{ secrets.VPN_SERVER }}
           VPN_PSK: ${{ secrets.VPN_PSK }}
         run: |
+          set -eu
+
           sudo tee /etc/ipsec.conf >/dev/null <<EOF
           config setup
               uniqueids=no
@@ -52,10 +54,31 @@ jobs:
 
           sudo chmod 600 /etc/ipsec.secrets
 
+      - name: Configure strongSwan logging
+        run: |
+          sudo tee /etc/strongswan.d/charon-logging.conf >/dev/null <<'EOF'
+          charon {
+              send_vendor_id = no
+
+              filelog {
+                  /var/log/charon.log {
+                      default = 2
+                      ike = 3
+                      cfg = 3
+                      enc = 2
+                      append = no
+                      flush_line = yes
+                  }
+              }
+          }
+          EOF
+
       - name: Configure xl2tpd
         env:
           VPN_SERVER: ${{ secrets.VPN_SERVER }}
         run: |
+          set -eu
+
           sudo tee /etc/xl2tpd/xl2tpd.conf >/dev/null <<EOF
           [global]
 
@@ -71,6 +94,8 @@ jobs:
           VPN_USERNAME: ${{ secrets.VPN_USERNAME }}
           VPN_PASSWORD: ${{ secrets.VPN_PASSWORD }}
         run: |
+          set -eu
+
           sudo tee /etc/ppp/options.sakura >/dev/null <<EOF
           ipcp-accept-local
           ipcp-accept-remote
@@ -81,7 +106,6 @@ jobs:
           refuse-mschap
 
           noauth
-          noccp
 
           require-mppe
 
@@ -103,15 +127,19 @@ jobs:
           sudo ipsec restart
           sleep 2
 
+          echo "--- IPsec connection ---"
           sudo ipsec up sakura-l2tp
 
           echo "--- IPsec status ---"
           sudo ipsec statusall
 
+          echo "--- XFRM ESP check ---"
           sudo ip xfrm state | grep -q 'proto esp'
 
       - name: Start xl2tpd
         run: |
+          set -e
+
           sudo systemctl restart xl2tpd
           sleep 2
 
@@ -123,6 +151,8 @@ jobs:
 
       - name: Connect L2TP
         run: |
+          set -e
+
           echo "c sakura" |
             sudo tee /var/run/xl2tpd/l2tp-control
 
@@ -143,7 +173,7 @@ jobs:
       - name: Diagnostics
         if: always()
         run: |
-          echo "--- IPsec ---"
+          echo "--- IPsec status ---"
           sudo ipsec statusall || true
 
           echo "--- XFRM state ---"
@@ -158,7 +188,17 @@ jobs:
           echo "--- routes ---"
           ip route || true
 
-          echo "--- xl2tpd / ppp logs ---"
+          echo "--- xl2tpd status ---"
+          sudo systemctl status xl2tpd --no-pager || true
+
+          echo "--- pppd executable ---"
+          ls -l /usr/sbin/pppd || true
+          sudo /usr/sbin/pppd --version || true
+
+          echo "--- charon.log ---"
+          sudo cat /var/log/charon.log || true
+
+          echo "--- xl2tpd / ppp / IPsec journal ---"
           sudo journalctl \
             --no-pager \
             --since '10 minutes ago' |
