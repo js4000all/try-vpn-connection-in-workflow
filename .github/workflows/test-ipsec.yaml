@@ -1,0 +1,107 @@
+name: Test IPsec connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-ipsec:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show environment
+        run: |
+          uname -a
+          cat /etc/os-release
+          ip addr
+          ip route
+
+      - name: Install strongSwan
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            strongswan \
+            strongswan-starter
+
+          ipsec --version
+
+      - name: Configure IPsec
+        env:
+          VPN_SERVER: ${{ secrets.VPN_SERVER }}
+          VPN_PSK: ${{ secrets.VPN_PSK }}
+        run: |
+          set -eu
+
+          sudo tee /etc/ipsec.conf >/dev/null <<EOF
+          config setup
+              uniqueids=no
+
+          conn sakura-l2tp
+              keyexchange=ikev1
+              aggressive=yes
+              type=transport
+              authby=psk
+
+              left=%defaultroute
+              leftprotoport=17/1701
+
+              right=${VPN_SERVER}
+              rightprotoport=17/1701
+
+              ike=aes256-sha1-modp1024!
+              esp=aes256-sha1!
+
+              pfs=no
+              auto=add
+          EOF
+
+          printf ': PSK "%s"\n' "${VPN_PSK}" |
+            sudo tee /etc/ipsec.secrets >/dev/null
+
+          sudo chmod 600 /etc/ipsec.secrets
+
+          echo '--- /etc/ipsec.conf ---'
+          sudo cat /etc/ipsec.conf
+
+      - name: Start strongSwan
+        run: |
+          set -x
+
+          sudo ipsec restart
+          sleep 2
+
+          sudo ipsec statusall
+
+      - name: Connect IPsec
+        run: |
+          sudo ipsec up sakura-l2tp
+
+          echo '--- status ---'
+          sudo ipsec statusall
+
+      - name: Show XFRM state
+        if: always()
+        run: |
+          echo '--- xfrm state ---'
+          sudo ip xfrm state || true
+
+          echo '--- xfrm policy ---'
+          sudo ip xfrm policy || true
+
+      - name: Show strongSwan logs
+        if: always()
+        run: |
+          echo '--- journalctl strongSwan ---'
+          sudo journalctl \
+            --no-pager \
+            --since '10 minutes ago' \
+            -u strongswan-starter \
+            -u strongswan \
+            || true
+
+          echo '--- syslog IPsec related ---'
+          sudo journalctl \
+            --no-pager \
+            --since '10 minutes ago' |
+            grep -Ei 'charon|ipsec|ike' |
+            tail -200 \
+            || true
