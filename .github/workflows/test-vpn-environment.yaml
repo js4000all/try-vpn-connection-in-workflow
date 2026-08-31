@@ -31,7 +31,27 @@ jobs:
           echo "--- after modprobe ---"
           ls -l /dev/ppp
           lsmod | grep -E 'ppp|l2tp' || true
+      - name: Diagnose pppd
+        run: |
+          set -x
 
+          command -v pppd || true
+          ls -l /usr/sbin/pppd
+          stat /usr/sbin/pppd
+          file /usr/sbin/pppd
+
+          mount | grep ' /usr ' || true
+          findmnt -T /usr/sbin/pppd
+
+          getfacl /usr/sbin/pppd || true
+
+          /usr/sbin/pppd --version || true
+          sudo /usr/sbin/pppd --version || true
+
+          sudo -u root /usr/sbin/pppd --version || true
+
+          dmesg | tail -100 || true
+          sudo journalctl -k -n 100 || true
       - name: Install VPN packages
         run: |
           sudo apt-get update
