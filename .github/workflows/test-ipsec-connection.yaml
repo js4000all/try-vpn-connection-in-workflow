@@ -35,6 +35,7 @@ jobs:
               authby=psk
 
               left=%defaultroute
+              leftid=@github-runner
               leftprotoport=17/1701
 
               right=${VPN_SERVER}
@@ -79,10 +80,11 @@ jobs:
           refuse-pap
           refuse-chap
           refuse-mschap
-          require-mschap-v2
 
           noauth
           noccp
+
+          require-mppe
 
           mtu 1280
           mru 1280
@@ -97,6 +99,8 @@ jobs:
 
       - name: Connect IPsec
         run: |
+          set -e
+
           sudo ipsec restart
           sleep 2
 
@@ -105,14 +109,15 @@ jobs:
           echo "--- IPsec status ---"
           sudo ipsec statusall
 
+          sudo ip xfrm state | grep -q 'proto esp'
+
       - name: Start xl2tpd
         run: |
-          sudo mkdir -p /var/run/xl2tpd
-
-          sudo xl2tpd -D &
-          echo $! | sudo tee /var/run/xl2tpd-test.pid
-
+          sudo systemctl restart xl2tpd
           sleep 2
+
+          echo "--- xl2tpd status ---"
+          sudo systemctl status xl2tpd --no-pager
 
           echo "--- xl2tpd process ---"
           ps aux | grep '[x]l2tpd'
