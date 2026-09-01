@@ -1,0 +1,14 @@
+name: Task demo
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: run command
+        run: curl example.com
+        
